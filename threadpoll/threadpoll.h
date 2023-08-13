@@ -81,6 +81,7 @@ threadpoll<T>::threadpoll(connection_pool *connPool,int thread_number,int max_re
         throw std::exception();
     }
     for(int i=0;i<thread_number;i++){
+        // 构造函数里面就已经把线程开辟好了 还设为分离状态 然后每个线程就开始调用worker
         if(pthread_create(m_threads+i,NULL,worker,this)!=0){
             delete[] m_threads;
             throw std::exception();
@@ -119,6 +120,7 @@ bool threadpoll<T>::append(T* request){
 
 template<typename T>
 void* threadpoll<T>::worker(void *arg){
+    // 构造函数中就开辟好了指定数量的线程 然后线程一次调用worker函数 传入的参数当前对象
     threadpoll *poll = arg;
     poll->run();
     return poll;
@@ -127,6 +129,12 @@ void* threadpoll<T>::worker(void *arg){
 template<typename T>
 void threadpoll<T>::run(){
     // zhu xun huan
+    // 如果线程池不关闭 就一直循环执行
+
+    // 从请求队列里面找一个请求 然后处理 
+    // 请求队列里面的请求是main函数中通过epoll监听 连接套接字的状态
+    // 当连接套接字的状态变为可读时，说明发来了新的http请求 这时候主函数中调用append 将这个http请求放入线程池对象的请求队列中
+    // 请求队列中有数据了 这时候工作线程就会把数据取出来 这个数据就是http对象
     while(!m_stop){
         m_queuestat.wait();
         m_queuelocker.lock();
